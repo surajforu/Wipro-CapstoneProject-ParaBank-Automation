@@ -1,48 +1,82 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+    }
+
     tools {
         maven 'Maven installations'
         jdk 'jdk21'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/surajforu/Wipro-CapstoneProject-ParaBank-Automation.git'
+                checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Verify Tools') {
             steps {
-                dir('ParaBankAutomationFramework') {
-                    bat 'mvn clean compile'
+                script {
+                    if (isUnix()) {
+                        sh 'java -version'
+                        sh 'mvn -version'
+                        sh 'git --version'
+                    } else {
+                        bat 'java -version'
+                        bat 'mvn -version'
+                        bat 'git --version'
+                    }
                 }
             }
         }
 
-        stage('Run Tests') {
+        stage('Build and Run Tests') {
             steps {
                 dir('ParaBankAutomationFramework') {
-                    bat 'mvn test'
+                    script {
+                        if (isUnix()) {
+                            sh 'mvn clean test -Dheadless=true'
+                        } else {
+                            bat 'mvn clean test -Dheadless=true'
+                        }
+                    }
                 }
             }
         }
     }
 
     post {
+
         always {
-            archiveArtifacts artifacts: '**/target/surefire-reports/*, **/test-output/**/*, **/screenshots/**/*',
-                             allowEmptyArchive: true
+
+            junit testResults:
+                'ParaBankAutomationFramework/target/surefire-reports/*.xml',
+                allowEmptyResults: true
+
+            archiveArtifacts artifacts:
+                'ParaBankAutomationFramework/target/surefire-reports/**/*,ParaBankAutomationFramework/test-output/**/*,ParaBankAutomationFramework/screenshots/**/*',
+                allowEmptyArchive: true
+
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'ParaBankAutomationFramework/test-output',
+                reportFiles: 'ExtentReport.html',
+                reportName: 'ParaBank Extent Report'
+            ])
         }
 
         success {
-            echo 'Build Successful!'
+            echo 'ParaBank test execution completed successfully.'
         }
 
         failure {
-            echo 'Build Failed!'
+            echo 'ParaBank test execution failed. Check the console output and screenshots.'
         }
     }
 }
