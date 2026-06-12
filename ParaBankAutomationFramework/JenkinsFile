@@ -6,7 +6,7 @@ pipeline {
     }
 
     tools {
-        maven 'Maven installations'
+        maven 'Maven3'
         jdk 'jdk21'
     }
 
