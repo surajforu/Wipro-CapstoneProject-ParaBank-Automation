@@ -23,25 +23,159 @@ pipeline {
                 script {
                     if (isUnix()) {
                         sh 'java -version'
-                        sh 'mvn -version'
                         sh 'git --version'
+                        sh 'docker version'
                     } else {
                         bat 'java -version'
-                        bat 'mvn -version'
                         bat 'git --version'
+                        bat 'docker version'
                     }
                 }
             }
         }
 
-        stage('Build and Run Tests') {
+        stage('Build Docker Image') {
             steps {
                 dir('ParaBankAutomationFramework') {
                     script {
                         if (isUnix()) {
-                            sh 'mvn clean test -Dheadless=true'
+                            sh '''
+                                docker build \
+                                -f DockerFile \
+                                -t parabank-tests:${BUILD_NUMBER} .
+                            '''
                         } else {
-                            bat 'mvn clean test -Dheadless=true'
+                            bat '''
+                                docker build ^
+                                -f DockerFile ^
+                                -t parabank-tests:%BUILD_NUMBER% .
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests in Docker') {
+            steps {
+                dir('ParaBankAutomationFramework') {
+                    script {
+
+                        if (isUnix()) {
+
+                            sh '''
+                                docker rm -f parabank-tests-${BUILD_NUMBER} \
+                                >/dev/null 2>&1 || true
+                            '''
+
+                            int testStatus = sh(
+                                returnStatus: true,
+                                script: '''
+                                    docker run \
+                                    --name parabank-tests-${BUILD_NUMBER} \
+                                    parabank-tests:${BUILD_NUMBER}
+                                '''
+                            )
+
+                            sh '''
+                                rm -rf target/surefire-reports
+                                rm -rf test-output
+                                rm -rf screenshots
+
+                                mkdir -p target
+
+                                docker cp \
+                                parabank-tests-${BUILD_NUMBER}:/app/target/surefire-reports \
+                                target/ || true
+
+                                docker cp \
+                                parabank-tests-${BUILD_NUMBER}:/app/test-output \
+                                . || true
+
+                                docker cp \
+                                parabank-tests-${BUILD_NUMBER}:/app/screenshots \
+                                . || true
+
+                                docker rm -f parabank-tests-${BUILD_NUMBER} || true
+                            '''
+
+                            if (testStatus != 0) {
+                                error('Tests failed inside Docker container')
+                            }
+
+                        } else {
+
+                            bat(
+                                returnStatus: true,
+                                script: '''
+                                    docker rm -f parabank-tests-%BUILD_NUMBER%
+                                '''
+                            )
+
+                            int testStatus = bat(
+                                returnStatus: true,
+                                script: '''
+                                    docker run ^
+                                    --name parabank-tests-%BUILD_NUMBER% ^
+                                    parabank-tests:%BUILD_NUMBER%
+                                '''
+                            )
+
+                            bat '''
+                                if exist target\\surefire-reports (
+                                    rmdir /s /q target\\surefire-reports
+                                )
+
+                                if exist test-output (
+                                    rmdir /s /q test-output
+                                )
+
+                                if exist screenshots (
+                                    rmdir /s /q screenshots
+                                )
+
+                                if not exist target (
+                                    mkdir target
+                                )
+                            '''
+
+                            bat(
+                                returnStatus: true,
+                                script: '''
+                                    docker cp ^
+                                    parabank-tests-%BUILD_NUMBER%:/app/target/surefire-reports ^
+                                    target\\
+                                '''
+                            )
+
+                            bat(
+                                returnStatus: true,
+                                script: '''
+                                    docker cp ^
+                                    parabank-tests-%BUILD_NUMBER%:/app/test-output ^
+                                    .
+                                '''
+                            )
+
+                            bat(
+                                returnStatus: true,
+                                script: '''
+                                    docker cp ^
+                                    parabank-tests-%BUILD_NUMBER%:/app/screenshots ^
+                                    .
+                                '''
+                            )
+
+                            bat(
+                                returnStatus: true,
+                                script: '''
+                                    docker rm -f parabank-tests-%BUILD_NUMBER%
+                                '''
+                            )
+
+                            if (testStatus != 0) {
+                                error('Tests failed inside Docker container')
+                            }
                         }
                     }
                 }
@@ -58,25 +192,46 @@ pipeline {
                 allowEmptyResults: true
 
             archiveArtifacts artifacts:
-                'ParaBankAutomationFramework/target/surefire-reports/**/*,ParaBankAutomationFramework/test-output/**/*,ParaBankAutomationFramework/screenshots/**/*',
+                'ParaBankAutomationFramework/target/surefire-reports/**/*,' +
+                'ParaBankAutomationFramework/test-output/**/*,' +
+                'ParaBankAutomationFramework/screenshots/**/*',
                 allowEmptyArchive: true
 
             publishHTML(target: [
                 allowMissing: true,
                 alwaysLinkToLastBuild: true,
                 keepAll: true,
-                reportDir: 'ParaBankAutomationFramework/test-output',
-                reportFiles: 'ExtentReport.html',
-                reportName: 'ParaBank Extent Report'
+                reportDir:
+                    'ParaBankAutomationFramework/test-output',
+                reportFiles:
+                    'ExtentReport.html',
+                reportName:
+                    'ParaBank Extent Report'
             ])
+
+            script {
+                if (isUnix()) {
+                    sh '''
+                        docker rm -f parabank-tests-${BUILD_NUMBER} \
+                        >/dev/null 2>&1 || true
+                    '''
+                } else {
+                    bat(
+                        returnStatus: true,
+                        script: '''
+                            docker rm -f parabank-tests-%BUILD_NUMBER%
+                        '''
+                    )
+                }
+            }
         }
 
         success {
-            echo 'ParaBank test execution completed successfully.'
+            echo 'ParaBank Docker test execution completed successfully.'
         }
 
         failure {
-            echo 'ParaBank test execution failed. Check the console output and screenshots.'
+            echo 'ParaBank Docker test execution failed. Check reports and screenshots.'
         }
     }
 }

@@ -1,10 +1,13 @@
 package com.parabank.base;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.time.Duration;
 
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
@@ -13,40 +16,68 @@ import utilities.ConfigReader;
 
 public class BaseTest {
 
-	protected WebDriver driver;
+    protected WebDriver driver;
 
-	@BeforeMethod
-	public void setup() {
+    @BeforeMethod
+    public void setup() {
 
-		WebDriverManager.chromedriver().setup();
+        ChromeOptions options = new ChromeOptions();
 
-		ChromeOptions options = new ChromeOptions();
+        boolean headless = Boolean.parseBoolean(
+                System.getProperty("headless", "false"));
 
-		boolean headless = Boolean.parseBoolean(System.getProperty("headless", "false"));
+        boolean docker = Boolean.parseBoolean(
+                System.getProperty("docker", "false"));
 
-		if (headless) {
-			options.addArguments("--headless=new");
-			options.addArguments("--window-size=1920,1080");
-		}
+        if (headless) {
+            options.addArguments("--headless=new");
+            options.addArguments("--no-sandbox");
+            options.addArguments("--disable-dev-shm-usage");
+            options.addArguments("--window-size=1920,1080");
+        }
 
-		driver = new ChromeDriver(options);
+        if (docker) {
 
-		driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
+            String gridUrl = System.getProperty(
+                    "selenium.grid.url",
+                    "http://selenium-chrome:4444");
 
-		driver.manage().window().maximize();
+            try {
+                driver = new RemoteWebDriver(
+                        new URL(gridUrl),
+                        options);
 
-		driver.get(ConfigReader.getProperty("url"));
-	}
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(
+                        "Invalid Selenium Grid URL: " + gridUrl,
+                        e);
+            }
 
-	@AfterMethod
-	public void tearDown() {
+        } else {
 
-		if (driver != null) {
-			driver.quit();
-		}
-	}
+            WebDriverManager.chromedriver().setup();
+            driver = new ChromeDriver(options);
+        }
+        if (!headless) {
+            driver.manage().window().maximize();
+        }
+
+        driver.manage().timeouts()
+                .implicitlyWait(Duration.ofSeconds(10));
+
+        driver.get(ConfigReader.getProperty("url"));
+    }
+
+    @AfterMethod
+    public void tearDown() {
+
+        if (driver != null) {
+            driver.quit();
+        }
+    }
 
 	public WebDriver getDriver() {
-		return driver;
+    return driver;
+
 	}
 }

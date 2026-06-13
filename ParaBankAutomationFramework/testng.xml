@@ -1,40 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
 
 <suite name="ParaBank Suite"
-       parallel="false"
-       preserve-order="true">
+	parallel="false"
+	preserve-order="true">
 
-    <listeners>
-        <listener class-name="listeners.TestListener"/>
-    </listeners>
+	<listeners>
+		<listener class-name="listeners.TestListener" />
+	</listeners>
 
-    <test name="ParaBank Tests"
-          preserve-order="true">
+	<test name="ParaBank Tests"
+		preserve-order="true">
 
-        <classes>
+		<classes>
 
-            <!-- Must run first because it creates and saves the user -->
-            <class name="testcases.RegistrationTest"/>
+			<class name="testcases.RegistrationTest" />
 
-            <!-- Reads credentials saved by RegistrationTest -->
-            <class name="testcases.LoginTest"/>
+			<class name="testcases.LoginTest" />
 
-            <!-- Creates the second account -->
-            <class name="testcases.OpenAccountTest"/>
+			<class name="testcases.OpenAccountTest" />
 
-            <!-- Uses two different accounts -->
-            <class name="testcases.TransferFundsTest"/>
+			<class name="testcases.TransferFundsTest" />
 
-            <!-- Runs twice because of DataProvider -->
-            <class name="testcases.BillPayTest"/>
+			<class name="testcases.BillPayTest" />
 
-            <!-- Contains invalid and empty login tests -->
-            <class name="testcases.NegativeTest"/>
+			<class name="testcases.NegativeTest" />
 
-        </classes>
+		</classes>
 
-    </test>
+	</test>
 
 </suite>

@@ -1,7 +1,6 @@
 package listeners;
 
-import java.io.IOException;
-
+import org.testng.ITestContext;
 import org.testng.ITestListener;
 import org.testng.ITestResult;
 
@@ -14,50 +13,71 @@ import utilities.ScreenshotUtil;
 
 public class TestListener implements ITestListener {
 
-	ExtentReports extent = ExtentManager.getInstance();
+    private final ExtentReports extent =
+            ExtentManager.getInstance();
 
-	ExtentTest test;
+    private ExtentTest test;
 
-	@Override
-	public void onTestStart(ITestResult result) {
+    @Override
+    public void onTestStart(ITestResult result) {
 
-		test = extent.createTest(result.getName());
-	}
+        test = extent.createTest(result.getName());
+    }
 
-	@Override
-	public void onTestSuccess(ITestResult result) {
+    @Override
+    public void onTestSuccess(ITestResult result) {
 
-		test.pass("Test Passed");
+        test.pass("Test Passed");
 
-		System.out.println("✓ " + result.getName() + " PASSED");
-	}
+        System.out.println(
+                "✓ " + result.getName() + " PASSED");
+    }
 
-	@Override
-	public void onTestFailure(ITestResult result) {
+    @Override
+    public void onTestFailure(ITestResult result) {
 
-		test.fail(result.getThrowable());
+        test.fail(result.getThrowable());
 
-		try {
+        try {
 
-			BaseTest base = (BaseTest) result.getInstance();
+            BaseTest base =
+                    (BaseTest) result.getInstance();
 
-			String path = ScreenshotUtil.captureScreenshot(base.getDriver(), result.getName());
+            if (base.getDriver() != null) {
 
-			test.addScreenCaptureFromPath("../" + path);
+                String path =
+                        ScreenshotUtil.captureScreenshot(
+                                base.getDriver(),
+                                result.getName());
 
-			System.out.println("📸 Screenshot Captured");
+                if (path != null) {
+                    test.addScreenCaptureFromPath(
+                            "../" + path);
+                }
 
-		} catch (IOException e) {
+                System.out.println(
+                        "Screenshot Captured: " + path);
 
-			e.printStackTrace();
-		}
+            } else {
 
-		System.out.println("✗ " + result.getName() + " FAILED");
-	}
+                System.out.println(
+                        "Screenshot not captured because driver is null.");
+            }
 
-	@Override
-	public void onFinish(org.testng.ITestContext context) {
+        } catch (Exception e) {
 
-		extent.flush();
-	}
+            System.out.println(
+                    "Screenshot capture failed: "
+                            + e.getMessage());
+        }
+
+        System.out.println(
+                "✗ " + result.getName() + " FAILED");
+    }
+
+    @Override
+    public void onFinish(ITestContext context) {
+
+        extent.flush();
+    }
 }
