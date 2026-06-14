@@ -704,46 +704,7 @@ The build is marked failed when the Docker test command returns a non-zero exit 
 
 ---
 
-## Execution Evidence
 
-### Successful Maven and TestNG Execution
-
-<p align="center">
-  <img src="docs/images/docker-test-build-success.png" alt="Successful Maven and TestNG execution" width="95%">
-</p>
-
-### Successful Jenkins Docker Pipeline
-
-<p align="center">
-  <img src="docs/images/jenkins-pipeline-success.png" alt="Successful Jenkins Docker pipeline" width="95%">
-</p>
-
-### Jenkins Dashboard and Test Trend
-
-<p align="center">
-  <img src="docs/images/jenkins-dashboard-success.png" alt="Jenkins dashboard showing successful build and test trend" width="95%">
-</p>
-
-### Eclipse Framework Structure
-
-<table>
-  <tr>
-    <td width="62%">
-      <img src="docs/images/eclipse-project-structure.png" alt="Eclipse project packages and framework classes">
-    </td>
-    <td width="38%">
-      <img src="docs/images/eclipse-root-files.png" alt="Dockerfile, JenkinsFile, POM and TestNG files">
-    </td>
-  </tr>
-</table>
-
-### Additional Local Execution View
-
-<p align="center">
-  <img src="docs/images/local-execution-summary.png" alt="Local execution output with all tests passed" width="85%">
-</p>
-
----
 
 ## Troubleshooting
 
