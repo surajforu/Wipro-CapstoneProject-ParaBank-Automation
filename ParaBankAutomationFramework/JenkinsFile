@@ -41,13 +41,13 @@ pipeline {
                         if (isUnix()) {
                             sh '''
                                 docker build \
-                                -f DockerFile \
+                                -f Dockerfile \
                                 -t parabank-tests:${BUILD_NUMBER} .
                             '''
                         } else {
                             bat '''
                                 docker build ^
-                                -f DockerFile ^
+                                -f Dockerfile ^
                                 -t parabank-tests:%BUILD_NUMBER% .
                             '''
                         }
