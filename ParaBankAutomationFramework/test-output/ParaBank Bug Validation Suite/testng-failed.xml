@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Failed suite [ParaBank Bug Validation Suite]" guice-stage="DEVELOPMENT">
+  <test thread-count="5" name="Negative Tests(failed)">
+    <classes>
+      <class name="negativecases.TransferFundsNegativeTest">
+        <methods>
+          <include name="setup"/>
+          <include name="verifyZeroAmountTransferIsNotAllowed"/>
+          <include name="tearDown"/>
+          <include name="verifySameAccountTransferIsNotAllowed"/>
+        </methods>
+      </class> <!-- negativecases.TransferFundsNegativeTest -->
+      <class name="negativecases.BillPayNegativeTest">
+        <methods>
+          <include name="setup"/>
+          <include name="tearDown"/>
+          <include name="verifyNegativeAmountBillPayIsNotAllowed"/>
+          <include name="verifyZeroAmountBillPayIsNotAllowed"/>
+        </methods>
+      </class> <!-- negativecases.BillPayNegativeTest -->
+    </classes>
+  </test> <!-- Negative Tests(failed) -->
+</suite> <!-- Failed suite [ParaBank Bug Validation Suite] -->

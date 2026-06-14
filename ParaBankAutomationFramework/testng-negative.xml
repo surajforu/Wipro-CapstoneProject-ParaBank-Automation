@@ -1,0 +1,15 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+
+<suite name="ParaBank Negative Suite" verbose="0">
+
+    <listeners>
+        <listener class-name="listeners.TestListener"/>
+    </listeners>
+
+    <test name="Negative Login Tests">
+        <classes>
+            <class name="testcases.NegativeTest"/>
+        </classes>
+    </test>
+
+</suite>
