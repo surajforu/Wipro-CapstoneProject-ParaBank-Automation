@@ -13,10 +13,18 @@ pipeline {
         jdk 'jdk21'
     }
 
+    environment {
+        DOCKER_NETWORK     = 'parabank-network'
+        SELENIUM_CONTAINER = 'selenium-chrome'
+        TEST_IMAGE         = "parabank-tests:${BUILD_NUMBER}"
+        TEST_CONTAINER     = "parabank-tests-${BUILD_NUMBER}"
+    }
+
     stages {
 
         stage('Checkout') {
             steps {
+                deleteDir()
                 checkout scm
             }
         }
@@ -44,55 +52,86 @@ pipeline {
                     if (isUnix()) {
 
                         sh '''
-                            docker network inspect parabank-network \
+                            docker network inspect "$DOCKER_NETWORK" \
                             >/dev/null 2>&1 || \
-                            docker network create parabank-network
+                            docker network create "$DOCKER_NETWORK"
 
-                            docker rm -f selenium-chrome \
+                            docker rm -f "$SELENIUM_CONTAINER" \
                             >/dev/null 2>&1 || true
 
                             docker run -d \
-                            --name selenium-chrome \
-                            --network parabank-network \
+                            --name "$SELENIUM_CONTAINER" \
+                            --network "$DOCKER_NETWORK" \
+                            -p 4444:4444 \
                             --shm-size=2g \
                             selenium/standalone-chrome:latest
-
-                            for i in $(seq 1 30)
-                            do
-                                STATUS=$(docker inspect \
-                                --format='{{.State.Health.Status}}' \
-                                selenium-chrome 2>/dev/null || true)
-
-                                if [ "$STATUS" = "healthy" ]
-                                then
-                                    echo "Selenium Grid is ready"
-                                    exit 0
-                                fi
-
-                                echo "Waiting for Selenium Grid..."
-                                sleep 2
-                            done
-
-                            docker logs selenium-chrome
-                            exit 1
                         '''
+
+                        timeout(time: 3, unit: 'MINUTES') {
+                            waitUntil {
+                                int status = sh(
+                                    returnStatus: true,
+                                    script: '''
+                                        curl -fsS \
+                                        http://localhost:4444/status \
+                                        | grep -q '"ready":true'
+                                    '''
+                                )
+
+                                if (status != 0) {
+                                    echo 'Waiting for Selenium Grid...'
+                                    sleep 3
+                                }
+
+                                return status == 0
+                            }
+                        }
+
+                        echo 'Selenium Grid is ready.'
 
                     } else {
 
                         bat '''
-                            docker network inspect parabank-network >nul 2>&1 || docker network create parabank-network
+                            docker network inspect %DOCKER_NETWORK% >nul 2>&1 || docker network create %DOCKER_NETWORK%
 
-                            docker rm -f selenium-chrome >nul 2>&1
+                            docker rm -f %SELENIUM_CONTAINER% >nul 2>&1
 
                             docker run -d ^
-                            --name selenium-chrome ^
-                            --network parabank-network ^
+                            --name %SELENIUM_CONTAINER% ^
+                            --network %DOCKER_NETWORK% ^
+                            -p 4444:4444 ^
                             --shm-size=2g ^
                             selenium/standalone-chrome:latest
                         '''
 
-                        bat '''
-                            powershell -NoProfile -ExecutionPolicy Bypass -Command "$ready=$false; for($i=1; $i -le 30; $i++){ $status=(docker inspect --format='{{.State.Health.Status}}' selenium-chrome 2>$null); if($status -eq 'healthy'){ Write-Host 'Selenium Grid is ready'; $ready=$true; break }; Write-Host 'Waiting for Selenium Grid...'; Start-Sleep -Seconds 2 }; if(-not $ready){ docker logs selenium-chrome; exit 1 }"
+                        powershell '''
+                            $ready = $false
+
+                            for ($i = 1; $i -le 60; $i++) {
+
+                                try {
+                                    $response = Invoke-RestMethod `
+                                        -Uri "http://localhost:4444/status" `
+                                        -TimeoutSec 5
+
+                                    if ($response.value.ready -eq $true) {
+                                        Write-Host "Selenium Grid is ready."
+                                        $ready = $true
+                                        break
+                                    }
+                                }
+                                catch {
+                                    Write-Host "Waiting for Selenium Grid..."
+                                }
+
+                                Start-Sleep -Seconds 3
+                            }
+
+                            if (-not $ready) {
+                                Write-Host "Selenium Grid did not become ready."
+                                docker logs $env:SELENIUM_CONTAINER
+                                exit 1
+                            }
                         '''
                     }
                 }
@@ -108,13 +147,13 @@ pipeline {
                             sh '''
                                 docker build \
                                 -f Dockerfile \
-                                -t parabank-tests:${BUILD_NUMBER} .
+                                -t "$TEST_IMAGE" .
                             '''
                         } else {
                             bat '''
                                 docker build ^
                                 -f Dockerfile ^
-                                -t parabank-tests:%BUILD_NUMBER% .
+                                -t %TEST_IMAGE% .
                             '''
                         }
                     }
@@ -127,21 +166,22 @@ pipeline {
                 dir('ParaBankAutomationFramework') {
                     script {
 
+                        int testStatus
+
                         if (isUnix()) {
 
                             sh '''
-                                docker rm -f \
-                                parabank-tests-${BUILD_NUMBER} \
+                                docker rm -f "$TEST_CONTAINER" \
                                 >/dev/null 2>&1 || true
                             '''
 
-                            int testStatus = sh(
+                            testStatus = sh(
                                 returnStatus: true,
                                 script: '''
                                     docker run \
-                                    --name parabank-tests-${BUILD_NUMBER} \
-                                    --network parabank-network \
-                                    parabank-tests:${BUILD_NUMBER}
+                                    --name "$TEST_CONTAINER" \
+                                    --network "$DOCKER_NETWORK" \
+                                    "$TEST_IMAGE"
                                 '''
                             )
 
@@ -153,41 +193,37 @@ pipeline {
                                 mkdir -p target
 
                                 docker cp \
-                                parabank-tests-${BUILD_NUMBER}:/app/target/surefire-reports \
+                                "$TEST_CONTAINER":/app/target/surefire-reports \
                                 target/ || true
 
                                 docker cp \
-                                parabank-tests-${BUILD_NUMBER}:/app/test-output \
+                                "$TEST_CONTAINER":/app/test-output \
                                 . || true
 
                                 docker cp \
-                                parabank-tests-${BUILD_NUMBER}:/app/screenshots \
+                                "$TEST_CONTAINER":/app/screenshots \
                                 . || true
 
-                                docker rm -f \
-                                parabank-tests-${BUILD_NUMBER} || true
+                                docker rm -f "$TEST_CONTAINER" \
+                                >/dev/null 2>&1 || true
                             '''
-
-                            if (testStatus != 0) {
-                                error('Tests failed inside Docker container')
-                            }
 
                         } else {
 
                             bat(
                                 returnStatus: true,
                                 script: '''
-                                    docker rm -f parabank-tests-%BUILD_NUMBER%
+                                    docker rm -f %TEST_CONTAINER%
                                 '''
                             )
 
-                            int testStatus = bat(
+                            testStatus = bat(
                                 returnStatus: true,
                                 script: '''
                                     docker run ^
-                                    --name parabank-tests-%BUILD_NUMBER% ^
-                                    --network parabank-network ^
-                                    parabank-tests:%BUILD_NUMBER%
+                                    --name %TEST_CONTAINER% ^
+                                    --network %DOCKER_NETWORK% ^
+                                    %TEST_IMAGE%
                                 '''
                             )
 
@@ -213,7 +249,7 @@ pipeline {
                                 returnStatus: true,
                                 script: '''
                                     docker cp ^
-                                    parabank-tests-%BUILD_NUMBER%:/app/target/surefire-reports ^
+                                    %TEST_CONTAINER%:/app/target/surefire-reports ^
                                     target\\
                                 '''
                             )
@@ -222,7 +258,7 @@ pipeline {
                                 returnStatus: true,
                                 script: '''
                                     docker cp ^
-                                    parabank-tests-%BUILD_NUMBER%:/app/test-output ^
+                                    %TEST_CONTAINER%:/app/test-output ^
                                     .
                                 '''
                             )
@@ -231,7 +267,7 @@ pipeline {
                                 returnStatus: true,
                                 script: '''
                                     docker cp ^
-                                    parabank-tests-%BUILD_NUMBER%:/app/screenshots ^
+                                    %TEST_CONTAINER%:/app/screenshots ^
                                     .
                                 '''
                             )
@@ -239,13 +275,13 @@ pipeline {
                             bat(
                                 returnStatus: true,
                                 script: '''
-                                    docker rm -f parabank-tests-%BUILD_NUMBER%
+                                    docker rm -f %TEST_CONTAINER%
                                 '''
                             )
+                        }
 
-                            if (testStatus != 0) {
-                                error('Tests failed inside Docker container')
-                            }
+                        if (testStatus != 0) {
+                            error('Tests failed inside Docker container.')
                         }
                     }
                 }
@@ -257,15 +293,19 @@ pipeline {
 
         always {
 
-            junit testResults:
-                'ParaBankAutomationFramework/target/surefire-reports/*.xml',
+            junit(
+                testResults:
+                    'ParaBankAutomationFramework/target/surefire-reports/*.xml',
                 allowEmptyResults: true
+            )
 
-            archiveArtifacts artifacts:
-                'ParaBankAutomationFramework/target/surefire-reports/**/*,' +
-                'ParaBankAutomationFramework/test-output/**/*,' +
-                'ParaBankAutomationFramework/screenshots/**/*',
+            archiveArtifacts(
+                artifacts:
+                    'ParaBankAutomationFramework/target/surefire-reports/**/*,' +
+                    'ParaBankAutomationFramework/test-output/**/*,' +
+                    'ParaBankAutomationFramework/screenshots/**/*',
                 allowEmptyArchive: true
+            )
 
             publishHTML(target: [
                 allowMissing: true,
@@ -284,11 +324,13 @@ pipeline {
                 if (isUnix()) {
 
                     sh '''
-                        docker rm -f \
-                        parabank-tests-${BUILD_NUMBER} \
+                        docker rm -f "$TEST_CONTAINER" \
                         >/dev/null 2>&1 || true
 
-                        docker rm -f selenium-chrome \
+                        docker rm -f "$SELENIUM_CONTAINER" \
+                        >/dev/null 2>&1 || true
+
+                        docker image rm -f "$TEST_IMAGE" \
                         >/dev/null 2>&1 || true
                     '''
 
@@ -297,8 +339,9 @@ pipeline {
                     bat(
                         returnStatus: true,
                         script: '''
-                            docker rm -f parabank-tests-%BUILD_NUMBER%
-                            docker rm -f selenium-chrome
+                            docker rm -f %TEST_CONTAINER%
+                            docker rm -f %SELENIUM_CONTAINER%
+                            docker image rm -f %TEST_IMAGE%
                         '''
                     )
                 }
@@ -314,3 +357,4 @@ pipeline {
         }
     }
 }
+
