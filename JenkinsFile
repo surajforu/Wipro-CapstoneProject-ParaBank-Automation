@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven installations'
+        jdk 'jdk21'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/surajforu/Wipro-CapstoneProject-ParaBank-Automation.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('ParaBankAutomationFramework') {
+                    bat 'mvn clean compile'
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                dir('ParaBankAutomationFramework') {
+                    bat 'mvn test'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: '**/target/surefire-reports/*, **/test-output/**/*, **/screenshots/**/*',
+                             allowEmptyArchive: true
+        }
+
+        success {
+            echo 'Build Successful!'
+        }
+
+        failure {
+            echo 'Build Failed!'
+        }
+    }
+}

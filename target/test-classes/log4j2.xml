@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Configuration status="OFF">
+
+    <Appenders>
+
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%msg%n"/>
+        </Console>
+
+    </Appenders>
+
+    <Loggers>
+
+        <!-- Disable WebDriverManager Logs -->
+        <Logger name="io.github.bonigarcia.wdm" level="OFF" additivity="false"/>
+
+        <!-- Disable Selenium Logs -->
+        <Logger name="org.openqa.selenium" level="OFF" additivity="false"/>
+
+        <!-- Disable TestNG Logs -->
+        <Logger name="org.testng" level="OFF" additivity="false"/>
+
+        <!-- Root Logger -->
+        <Root level="ERROR">
+            <AppenderRef ref="Console"/>
+        </Root>
+
+    </Loggers>
+
+</Configuration>
