@@ -20,6 +20,12 @@ public class BaseTest {
 
     @BeforeMethod
     public void setup() {
+    	System.setProperty("webdriver.http.factory", "jdk-http-client");
+        System.setProperty("wdm.quiet", "true");
+        System.setProperty("webdriver.chrome.silentOutput", "true");
+ 
+        java.util.logging.Logger.getLogger("org.openqa.selenium").setLevel(java.util.logging.Level.SEVERE);
+
 
         ChromeOptions options = new ChromeOptions();
 
